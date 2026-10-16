@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Historial de Movimientos - FinDash{% endblock %}
+
+{% block extra_head %}
+<style>
+    .filters { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.25rem; }
+    .filters select { width: auto; min-width: 170px; padding: .6rem .9rem; font-size: .85rem; }
+    .acc-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; cursor: pointer; width: 100%; background: none; border: none; color: inherit; font: inherit; text-align: left; padding: 0; }
+    .acc-head h3 { font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: .5rem; margin: 0; }
+    .acc-body { margin-top: 1.25rem; }
+    #importar:not(.open) .acc-body { display: none; }
+    #importar.open .acc-caret { transform: rotate(180deg); }
+    .acc-caret { transition: transform .2s; }
+    .empty-state-card { text-align: center; padding: 4rem 2rem; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius); grid-column: span 12; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <h1 class="page-title">Libro Mayor</h1>
+        <p class="page-sub">Todos tus movimientos{% if total %} ({{ total }}){% endif %}: edítalos, impórtalos o expórtalos.</p>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+        <a href="{{ url_for('movimientos.exportar_csv') }}" class="btn-primary btn-ghost btn-sm"><i class="ph ph-download-simple"></i> CSV</a>
+        <a href="{{ url_for('movimientos.anadir') }}" class="btn-primary btn-sm"><i class="ph ph-plus"></i> Nuevo</a>
+    </div>
+</header>
+
+<div class="bento-grid" style="margin-top:0;">
+
+    {# ================= IMPORTAR EXTRACTO ================= #}
+    <div class="bento-card span-12 {% if not hay_movimientos %}open{% endif %}" id="importar">
+        <button type="button" class="acc-head" id="importarToggle" aria-expanded="false" aria-controls="importarCuerpo">
+            <h3><i class="ph ph-upload-simple" style="color:var(--primary);"></i> Importar extracto bancario</h3>
+            <i class="ph ph-caret-down acc-caret"></i>
+        </button>
+        <div class="acc-body" id="importarCuerpo">
+            <p class="page-sub" style="margin-bottom:1rem;font-size:.88rem;">
+                Sube el CSV, Excel o PDF de tu banco, o pega el texto de los movimientos. Verás una vista previa antes de guardar nada;
+                lo que ya tengas registrado no se duplica.
+            </p>
+            <div class="import-tabs" role="tablist">
+                <button type="button" class="period-btn active" data-modo="archivo" role="tab">Archivo</button>
+                <button type="button" class="period-btn" data-modo="texto" role="tab">Pegar texto</button>
+            </div>
+
+            <div id="impModoArchivo">
+                <label class="import-drop" id="impDrop" for="impArchivo">
+                    <i class="ph ph-file-arrow-up"></i>
+                    <span id="impNombre">Arrastra aquí tu archivo o haz clic para elegirlo</span>
+                    <small>CSV, XLSX o PDF · máximo 10 MB</small>
+                </label>
+                <input type="file" id="impArchivo" accept=".csv,.tsv,.txt,.xlsx,.pdf" hidden>
+            </div>
+            <div id="impModoTexto" hidden>
+                <textarea id="impTexto" class="form-input import-text" spellcheck="false"
+                          placeholder="Pega aquí los movimientos copiados de tu banca online…&#10;12/03/2026  COMPRA MERCADONA  -45,20  1.234,56"></textarea>
+            </div>
+
+            <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap;">
+                <button type="button" class="btn-primary btn-sm" id="impAnalizar"><i class="ph ph-magnifying-glass"></i> Analizar</button>
+                <span id="impEstado" class="page-sub" style="align-self:center;font-size:.85rem;" aria-live="polite"></span>
+            </div>
+
+            <div id="impResultado" hidden>
+                <div class="import-summary" id="impResumen"></div>
+                <div class="import-warnings" id="impAvisos"></div>
+                <div class="import-preview" style="margin-top:1rem;">
+                    <table>
+                        <thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Tipo</th><th style="text-align:right;">Importe</th><th></th></tr></thead>
+                        <tbody id="impFilas"></tbody>
+                    </table>
+                </div>
+                <p class="kpi-hint" id="impTruncado" hidden>Solo se muestran los primeros 200 movimientos; se importarán todos.</p>
+                <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap;">
+                    <button type="button" class="btn-primary btn-sm" id="impConfirmar"><i class="ph ph-check-circle"></i> Confirmar importación</button>
+                    <button type="button" class="btn-primary btn-sm btn-ghost" id="impCancelar">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if hay_movimientos %}
+    <form method="GET" class="filters span-12" style="grid-column: span 12;">
+        <select name="tipo" aria-label="Tipo" onchange="this.form.submit()">
+            <option value="">Todos los tipos</option>
+            <option value="gasto" {% if filtro_tipo == 'gasto' %}selected{% endif %}>Solo gastos</option>
+            <option value="ingreso" {% if filtro_tipo == 'ingreso' %}selected{% endif %}>Solo ingresos</option>
+        </select>
+        <select name="categoria" aria-label="Categoría" onchange="this.form.submit()">
+            <option value="">Todas las categorías</option>
+            {% for c in categorias.gasto + categorias.ingreso + categorias.propias %}
+            <option value="{{ c }}" {% if filtro_categoria == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
+        {% if filtro_tipo or filtro_categoria %}
+        <a href="{{ url_for('movimientos.transactions') }}" class="link-filter">Quitar filtros</a>
+        {% endif %}
+    </form>
+    {% endif %}
+
+    {% if movimientos %}
+        <div class="bento-card span-12" style="padding:0;overflow:hidden;">
+            <div class="tx-container">
+                <table class="table-premium">
+                    <thead>
+                        <tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right;">Importe</th><th style="text-align:right;">Acciones</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for mov in movimientos %}
+                        <tr>
+                            <td class="text-muted" style="font-size:.85rem;white-space:nowrap;">{{ mov.fecha }}</td>
+                            <td class="concepto-cell" title="{{ mov.concepto }}">{{ mov.concepto }}</td>
+                            <td><span class="cat-badge"><i class="ph ph-tag" style="color:var(--primary);"></i> {{ mov.categoria }}</span></td>
+                            <td class="num money {{ 'text-success' if mov.tipo == 'ingreso' else '' }}" style="font-size:1.02rem;">
+                                {{ '+' if mov.tipo == 'ingreso' else '-' }}{{ mov.importe | format_currency }}
+                            </td>
+                            <td>
+                                <div class="action-btns">
+                                    <button type="button" class="btn-icon info js-editar" title="Editar"
+                                            data-id="{{ mov.id }}" data-fecha="{{ mov.fecha }}" data-concepto="{{ mov.concepto }}"
+                                            data-categoria="{{ mov.categoria }}" data-importe="{{ '%.2f'|format(mov.importe) }}" data-tipo="{{ mov.tipo }}">
+                                        <i class="ph ph-pencil-simple"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('movimientos.duplicar', movimiento_id=mov.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn-icon info" title="Duplicar"><i class="ph ph-copy"></i></button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('movimientos.borrar', movimiento_id=mov.id) }}" onsubmit="return confirm('¿Eliminar este registro?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn-icon danger" title="Eliminar"><i class="ph ph-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if total_pages > 1 %}
+        <div class="span-12" style="grid-column: span 12;">
+            <div class="pagination">
+                <a href="{{ url_for('movimientos.transactions', page=page - 1, tipo=filtro_tipo or None, categoria=filtro_categoria or None) }}" class="page-btn {% if page == 1 %}disabled{% endif %}"><i class="ph ph-caret-left"></i> Anterior</a>
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                        <span class="page-btn active">{{ p }}</span>
+                    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                        <a href="{{ url_for('movimientos.transactions', page=p, tipo=filtro_tipo or None, categoria=filtro_categoria or None) }}" class="page-btn">{{ p }}</a>
+                    {% elif p == page - 3 or p == page + 3 %}
+                        <span style="color:var(--text-muted);padding:0 .25rem;">…</span>
+                    {% endif %}
+                {% endfor %}
+                <a href="{{ url_for('movimientos.transactions', page=page + 1, tipo=filtro_tipo or None, categoria=filtro_categoria or None) }}" class="page-btn {% if page == total_pages %}disabled{% endif %}">Siguiente <i class="ph ph-caret-right"></i></a>
+            </div>
+        </div>
+        {% endif %}
+
+    {% elif hay_movimientos %}
+        <div class="empty-state-card">
+            <i class="ph-fill ph-funnel" style="font-size:2.5rem;color:var(--text-muted);opacity:.5;"></i>
+            <h3 style="font-size:1.2rem;font-weight:800;margin:.5rem 0;">Sin resultados</h3>
+            <p class="page-sub">Ningún movimiento coincide con los filtros.</p>
+        </div>
+    {% else %}
+        <div class="empty-state-card">
+            <i class="ph-fill ph-receipt" style="font-size:3.5rem;color:var(--text-muted);opacity:.5;"></i>
+            <h3 style="font-size:1.5rem;font-weight:800;margin:.75rem 0 .5rem;">Libro mayor en blanco</h3>
+            <p class="page-sub" style="max-width:450px;margin:0 auto 1.5rem;line-height:1.5;">
+                Importa tu extracto con el panel de arriba o añade tu primer movimiento a mano.
+            </p>
+            <a href="{{ url_for('movimientos.anadir') }}" class="btn-primary"><i class="ph ph-plus-circle"></i> Añadir primer movimiento</a>
+        </div>
+    {% endif %}
+</div>
+
+{# ================= MODAL DE EDICIÓN ================= #}
+<div class="modal-backdrop" id="modalEditar" role="dialog" aria-modal="true" aria-labelledby="modalEditarTitulo">
+    <form class="modal" id="formEditar" autocomplete="off">
+        <h3 id="modalEditarTitulo"><i class="ph ph-pencil-simple" style="color:var(--primary);"></i> Editar movimiento</h3>
+        <input type="hidden" id="edId">
+        <div class="form-group">
+            <label for="edTipo">Tipo</label>
+            <select id="edTipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select>
+        </div>
+        <div class="grid-2">
+            <div class="form-group"><label for="edFecha">Fecha</label><input type="date" id="edFecha" class="form-input" max="{{ hoy }}" required></div>
+            <div class="form-group"><label for="edImporte">Importe (€)</label><input type="number" step="0.01" min="0.01" id="edImporte" class="form-input" required inputmode="decimal"></div>
+        </div>
+        <div class="form-group"><label for="edConcepto">Concepto</label><input type="text" id="edConcepto" class="form-input" maxlength="200" required></div>
+        <div class="form-group">
+            <label for="edCategoria">Categoría</label>
+            <select id="edCategoria">
+                <option value="">Automática</option>
+                <optgroup label="Gastos">{% for c in categorias.gasto %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>
+                <optgroup label="Ingresos">{% for c in categorias.ingreso %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>
+                {% if categorias.propias %}<optgroup label="Otras">{% for c in categorias.propias %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>{% endif %}
+            </select>
+        </div>
+        <label class="check-row" id="edSimilaresFila" hidden>
+            <input type="checkbox" id="edSimilares">
+            <span>Aplicar también a los movimientos anteriores de este comercio. FinDash recordará tu elección para futuras importaciones.</span>
+        </label>
+        <div class="alert-banner danger" id="edError" hidden style="margin-top:1rem;"></div>
+        <div class="modal-actions">
+            <button type="button" class="btn-primary btn-sm btn-ghost" id="edCancelar">Cancelar</button>
+            <button type="submit" class="btn-primary btn-sm" id="edGuardar">Guardar cambios</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/movimientos.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/importar.js') }}?v=3"></script>
+{% endblock %}

@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración - FinDash{% endblock %}
+
+{% block extra_head %}
+<style>
+    .settings-tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); overflow-x: auto; padding-bottom: 1px; scrollbar-width: none; }
+    .settings-tabs::-webkit-scrollbar { display: none; }
+    .settings-tab { padding: 0.85rem 1.25rem; border: none; background: transparent; font-size: 0.95rem; font-weight: 700; color: var(--text-muted); cursor: pointer; white-space: nowrap; position: relative; display: flex; align-items: center; gap: 0.5rem; transition: var(--transition); font-family: inherit; }
+    .settings-tab:hover { color: var(--text-main); }
+    .settings-tab.active { color: var(--primary); }
+    .settings-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: var(--primary); border-radius: 3px 3px 0 0; }
+    .settings-panel { display: none; }
+    .settings-panel.active { display: block; }
+
+    .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .theme-box { border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-main); padding: 1.5rem 1rem; text-align: center; cursor: pointer; color: var(--text-secondary); font-weight: 700; transition: var(--transition); font-family: inherit; font-size: .95rem; }
+    .theme-box:hover { border-color: var(--text-muted); }
+    .theme-box.active { border-color: var(--primary); color: var(--primary); background: rgba(0,229,153,0.05); box-shadow: 0 0 0 1px var(--primary); }
+    .theme-box .icon { font-size: 2rem; margin-bottom: 0.75rem; }
+
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 0; border-bottom: 1px solid var(--border-color); gap: 1rem; }
+    .toggle-row:last-child { border-bottom: none; }
+    .switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); border-radius: 30px; transition: .3s; }
+    .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: var(--text-muted); border-radius: 50%; transition: .3s; }
+    input:checked + .slider { background-color: rgba(0,229,153,0.2); outline: 1px solid var(--primary); }
+    input:checked + .slider:before { transform: translateX(22px); background-color: var(--primary); }
+    input:focus-visible + .slider { box-shadow: 0 0 0 3px rgba(0,229,153,.35); }
+
+    .presu-row, .rec-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--bg-main); border-radius: 10px; border: 1px solid var(--border-color); gap: 1rem; flex-wrap: wrap; }
+    .rec-row.pausado { opacity: .6; }
+    .rec-main { min-width: 0; flex: 1 1 220px; }
+    .rec-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rec-actions { display: flex; gap: .5rem; align-items: center; }
+    .rec-actions form { margin: 0; }
+    .meta-item { padding: 1.25rem; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="page-header" style="margin-bottom:1.5rem;">
+    <div>
+        <h1 class="page-title">Configuración</h1>
+        <p class="page-sub">Adapta FinDash a tu forma de manejar el dinero.</p>
+    </div>
+</header>
+
+<div class="settings-tabs" role="tablist">
+    <button class="settings-tab active" data-tab="perfil" role="tab"><i class="ph ph-user"></i> Perfil</button>
+    <button class="settings-tab" data-tab="presupuestos" role="tab"><i class="ph ph-wallet"></i> Presupuestos</button>
+    <button class="settings-tab" data-tab="metas" role="tab"><i class="ph ph-target"></i> Metas</button>
+    <button class="settings-tab" data-tab="recurrentes" role="tab"><i class="ph ph-arrows-clockwise"></i> Recurrentes</button>
+    <button class="settings-tab" data-tab="preferencias" role="tab"><i class="ph ph-palette"></i> Preferencias</button>
+    <button class="settings-tab" data-tab="datos" role="tab"><i class="ph ph-shield-check"></i> Datos</button>
+</div>
+
+{# ============================ PERFIL ============================ #}
+<div class="settings-panel active" id="panel-perfil">
+    <div class="bento-grid" style="margin-top:0;">
+        <div class="bento-card span-8">
+            <h3 class="card-title"><i class="ph ph-identification-card" style="color:var(--success);"></i> Identidad del usuario</h3>
+            <form method="POST" action="{{ url_for('ajustes.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="guardar_perfil">
+                <div class="form-group">
+                    <label for="nombrevisible">Nombre visible</label>
+                    <input type="text" id="nombrevisible" name="nombrevisible" class="form-input" value="{{ nombre }}" required minlength="2" maxlength="50">
+                </div>
+                <div class="form-group" style="opacity:0.6;">
+                    <label for="emailReal">Correo electrónico</label>
+                    <input type="email" id="emailReal" class="form-input" value="{{ email_real }}" disabled>
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top:1rem;"><i class="ph ph-floppy-disk"></i> Actualizar perfil</button>
+            </form>
+        </div>
+        <div class="bento-card span-4">
+            <h3 class="card-title"><i class="ph ph-sign-out" style="color:var(--warning);"></i> Sesión</h3>
+            <p class="page-sub" style="font-size:.88rem;margin-bottom:1rem;">Cierra la sesión en este dispositivo.</p>
+            <form method="POST" action="{{ url_for('auth.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-primary btn-ghost" style="width:100%;justify-content:center;"><i class="ph ph-sign-out"></i> Cerrar sesión</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ============================ PRESUPUESTOS ============================ #}
+<div class="settings-panel" id="panel-presupuestos">
+    <div class="bento-grid" style="margin-top:0;">
+        <div class="bento-card span-8">
+            <h3 class="card-title"><i class="ph ph-warning-circle" style="color:var(--warning);"></i> Límites de gasto mensual</h3>
+            <p class="page-sub" style="font-size:.85rem;margin-bottom:1.5rem;">Deja el campo vacío para no aplicar límite en esa categoría. Te avisaremos al llegar al 80 % y al superarlo.</p>
+            <form method="POST" action="{{ url_for('ajustes.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="guardar_presupuestos">
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                {% for cat in categorias_presupuesto %}
+                    <div class="presu-row">
+                        <span style="font-weight:700;display:flex;align-items:center;gap:0.75rem;">
+                            <i class="ph {{ iconos.get(cat, 'ph-tag') }}" style="color:var(--primary);font-size:1.2rem;"></i> {{ cat }}
+                        </span>
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <input type="number" step="0.01" min="0" name="presu_{{ cat }}" aria-label="Límite mensual de {{ cat }}"
+                                   value="{{ '%.2f'|format(presupuestos[cat]) if presupuestos.get(cat) else '' }}"
+                                   class="form-input" style="width:120px;text-align:right;padding:0.5rem;" placeholder="Sin límite">
+                            <span style="font-weight:800;color:var(--text-muted);">€</span>
+                        </div>
+                    </div>
+                {% endfor %}
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top:1.5rem;width:100%;justify-content:center;"><i class="ph ph-check-circle"></i> Guardar límites</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ============================ METAS ============================ #}
+<div class="settings-panel" id="panel-metas">
+    <div class="bento-grid" style="margin-top:0;">
+        <div class="bento-card span-6">
+            <h3 class="card-title"><i class="ph ph-flag-checkered" style="color:var(--success);"></i> Tus objetivos</h3>
+            {% if metas %}
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                {% for meta in metas %}
+                    <div class="meta-item">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+                            <div style="min-width:0;">
+                                <div style="font-weight:800;font-size:1.05rem;">{{ meta.nombre }}</div>
+                                <div class="kpi-hint">Objetivo: <strong class="money" style="color:var(--text-main);">{{ meta.cantidad_objetivo | format_currency }}</strong>
+                                    {% if meta.fecha_objetivo %} · para el {{ meta.fecha_objetivo }}{% endif %}</div>
+                            </div>
+                            <form method="POST" action="{{ url_for('ajustes.settings') }}" style="margin:0;" onsubmit="return confirm('¿Eliminar esta meta?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="accion" value="borrar_meta">
+                                <input type="hidden" name="meta_id" value="{{ meta.id }}">
+                                <button type="submit" class="btn-icon danger" title="Eliminar meta" aria-label="Eliminar meta"><i class="ph ph-trash"></i></button>
+                            </form>
+                        </div>
+                        <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ meta.porcentaje }}%;"></div></div>
+                        <div class="kpi-hint" style="text-align:right;">{% if meta.completada %}¡Conseguida! 🎉{% else %}{{ meta.porcentaje | string | replace('.', ',') }}% de tu saldo acumulado{% endif %}</div>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-mini"><i class="ph ph-target" style="font-size:2rem;color:var(--text-muted);opacity:.5;"></i><p>No hay metas activas.</p></div>
+            {% endif %}
+        </div>
+
+        <div class="bento-card span-6">
+            <h3 class="card-title">Nuevo objetivo</h3>
+            <form method="POST" action="{{ url_for('ajustes.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="nueva_meta">
+                <div class="form-group"><label for="meta_nombre">Nombre del objetivo</label>
+                    <input type="text" id="meta_nombre" name="meta_nombre" class="form-input" placeholder="Ej: Fondo de emergencia" required maxlength="60"></div>
+                <div class="grid-2">
+                    <div class="form-group"><label for="meta_objetivo">Cantidad objetivo (€)</label>
+                        <input type="number" step="0.01" min="1" id="meta_objetivo" name="meta_objetivo" class="form-input" placeholder="5000.00" required inputmode="decimal"></div>
+                    <div class="form-group"><label for="meta_fecha">Fecha objetivo (opcional)</label>
+                        <input type="date" id="meta_fecha" name="meta_fecha" class="form-input"></div>
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top:.5rem;width:100%;justify-content:center;"><i class="ph ph-plus"></i> Registrar meta</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ============================ RECURRENTES ============================ #}
+<div class="settings-panel" id="panel-recurrentes">
+    <div class="bento-grid" style="margin-top:0;">
+        <div class="bento-card span-8">
+            <h3 class="card-title"><i class="ph ph-arrows-clockwise" style="color:var(--primary);"></i> Movimientos recurrentes</h3>
+            <p class="page-sub" style="font-size:.85rem;margin-bottom:1.5rem;line-height:1.5;">
+                Alquiler, suscripciones, nómina… FinDash los registra solo cuando llega su día (si el mes no tiene ese día, se usa el último).
+                Cada recurrente se registra una única vez por mes.
+            </p>
+            {% if recurrentes %}
+            <div style="display:flex;flex-direction:column;gap:.75rem;">
+                {% for r in recurrentes %}
+                <div class="rec-row {% if not r.activo %}pausado{% endif %}">
+                    <div class="rec-main">
+                        <strong title="{{ r.concepto }}">{{ r.concepto }}</strong>
+                        <div class="kpi-hint">Día {{ r.dia_mes }} de cada mes · {{ r.categoria }}</div>
+                    </div>
+                    <div>
+                        {% if not r.activo %}<span class="chip off"><i class="ph ph-pause"></i> Pausado</span>
+                        {% elif r.pendiente_este_mes %}<span class="chip warn"><i class="ph ph-clock"></i> Pendiente este mes</span>
+                        {% else %}<span class="chip ok"><i class="ph ph-check"></i> Registrado este mes</span>{% endif %}
+                    </div>
+                    <div class="num money {{ 'text-success' if r.tipo == 'ingreso' else '' }}">{{ '+' if r.tipo == 'ingreso' else '-' }}{{ r.importe | format_currency }}</div>
+                    <div class="rec-actions">
+                        <button type="button" class="btn-icon info js-editar-rec" title="Editar" aria-label="Editar"
+                                data-id="{{ r.id }}" data-tipo="{{ r.tipo }}" data-concepto="{{ r.concepto }}" data-importe="{{ '%.2f'|format(r.importe) }}"
+                                data-dia="{{ r.dia_mes }}" data-categoria="{{ r.categoria }}"><i class="ph ph-pencil-simple"></i></button>
+                        <form method="POST" action="{{ url_for('ajustes.settings') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="accion" value="alternar_recurrente">
+                            <input type="hidden" name="recurrente_id" value="{{ r.id }}">
+                            <button type="submit" class="btn-icon" title="{{ 'Reanudar' if not r.activo else 'Pausar' }}" aria-label="{{ 'Reanudar' if not r.activo else 'Pausar' }}"><i class="ph {{ 'ph-play' if not r.activo else 'ph-pause' }}"></i></button>
+                        </form>
+                        <form method="POST" action="{{ url_for('ajustes.settings') }}" onsubmit="return confirm('¿Eliminar este recurrente? Los movimientos ya registrados se conservan.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="accion" value="borrar_recurrente">
+                            <input type="hidden" name="recurrente_id" value="{{ r.id }}">
+                            <button type="submit" class="btn-icon danger" title="Eliminar" aria-label="Eliminar"><i class="ph ph-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-mini"><i class="ph ph-arrows-clockwise" style="font-size:2rem;color:var(--text-muted);opacity:.5;"></i>
+                <p>Todavía no tienes movimientos recurrentes. Crea el primero con el formulario.</p></div>
+            {% endif %}
+        </div>
+
+        <div class="bento-card span-4">
+            <h3 class="card-title">Nuevo recurrente</h3>
+            <form method="POST" action="{{ url_for('ajustes.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="crear_recurrente">
+                <div class="form-group"><label for="nrTipo">Tipo</label>
+                    <select id="nrTipo" name="tipo" class="js-tipo-rec" data-destino="nrCategoria"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
+                <div class="form-group"><label for="nrConcepto">Concepto</label>
+                    <input type="text" id="nrConcepto" name="concepto" class="form-input" placeholder="Ej: Netflix, Alquiler…" required maxlength="200"></div>
+                <div class="grid-2">
+                    <div class="form-group"><label for="nrImporte">Importe (€)</label>
+                        <input type="number" step="0.01" min="0.01" id="nrImporte" name="importe" class="form-input" required inputmode="decimal"></div>
+                    <div class="form-group"><label for="nrDia">Día del mes</label>
+                        <input type="number" min="1" max="31" id="nrDia" name="dia_mes" class="form-input" required inputmode="numeric"></div>
+                </div>
+                <div class="form-group"><label for="nrCategoria">Categoría</label>
+                    <select id="nrCategoria" name="categoria">
+                        <option value="">Automática</option>
+                        <optgroup label="Gastos" data-tipo="gasto">{% for c in categorias_gasto %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>
+                        <optgroup label="Ingresos" data-tipo="ingreso">{% for c in categorias_ingreso %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>
+                    </select></div>
+                <label class="check-row"><input type="checkbox" name="aplicar_este_mes" value="1" checked>
+                    <span>Registrar ya el de este mes si su día ya ha pasado</span></label>
+                <button type="submit" class="btn-primary" style="margin-top:1.25rem;width:100%;justify-content:center;"><i class="ph ph-plus"></i> Crear recurrente</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ============================ PREFERENCIAS ============================ #}
+<div class="settings-panel" id="panel-preferencias">
+    <div class="bento-grid" style="margin-top:0;">
+        <div class="bento-card span-6">
+            <h3 class="card-title"><i class="ph ph-paint-brush" style="color:var(--success);"></i> Interfaz visual</h3>
+            <div class="theme-grid">
+                <button type="button" class="theme-box" onclick="uiSetTheme('light')" id="theme-light"><div class="icon"><i class="ph ph-sun"></i></div> Claro</button>
+                <button type="button" class="theme-box" onclick="uiSetTheme('dark')" id="theme-dark"><div class="icon"><i class="ph ph-moon"></i></div> Oscuro</button>
+                <button type="button" class="theme-box" onclick="uiSetTheme('system')" id="theme-system"><div class="icon"><i class="ph ph-desktop"></i></div> Auto</button>
+            </div>
+            <p class="kpi-hint" style="margin-top:1rem;">Tu elección se guarda en tu cuenta y se aplica en todos tus dispositivos.</p>
+        </div>
+        <div class="bento-card span-6">
+            <h3 class="card-title"><i class="ph ph-sliders-horizontal" style="color:var(--info);"></i> Comportamiento</h3>
+            <div class="toggle-row">
+                <div><strong style="font-size:.95rem;">Modo privacidad</strong>
+                    <p class="kpi-hint">Difumina los importes (pasa el ratón por encima para verlos).</p></div>
+                <label class="switch"><input type="checkbox" id="toggle-privacy" aria-label="Modo privacidad" {% if privacidad %}checked{% endif %} onchange="guardarPreferenciasCloud()"><span class="slider"></span></label>
+            </div>
+            <div class="toggle-row">
+                <div><strong style="font-size:.95rem;">Reducir animaciones</strong>
+                    <p class="kpi-hint">Desactiva transiciones y efectos visuales.</p></div>
+                <label class="switch"><input type="checkbox" id="toggle-animations" aria-label="Reducir animaciones" {% if animaciones %}checked{% endif %} onchange="guardarPreferenciasCloud()"><span class="slider"></span></label>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ============================ DATOS ============================ #}
+<div class="settings-panel" id="panel-datos">
+    <div class="bento-grid" style="margin-top:0;">
+        <div class="bento-card span-4">
+            <h3 class="card-title"><i class="ph ph-upload-simple" style="color:var(--primary);"></i> Importar extracto</h3>
+            <p class="page-sub" style="font-size:.9rem;margin-bottom:1.5rem;">Sube el CSV, Excel o PDF de tu banco, o pega el texto.</p>
+            <a href="{{ url_for('movimientos.transactions') }}#importar" class="btn-primary btn-ghost" style="width:100%;justify-content:center;"><i class="ph ph-upload-simple" style="color:var(--primary);"></i> Ir a importar</a>
+        </div>
+        <div class="bento-card span-4">
+            <h3 class="card-title"><i class="ph ph-export" style="color:var(--success);"></i> Exportación</h3>
+            <p class="page-sub" style="font-size:.9rem;margin-bottom:1.5rem;">Descarga todos tus registros en CSV compatible con Excel.</p>
+            <a href="{{ url_for('movimientos.exportar_csv') }}" class="btn-primary btn-ghost" style="width:100%;justify-content:center;"><i class="ph ph-file-csv" style="color:var(--success);"></i> Generar CSV</a>
+        </div>
+        <div class="bento-card span-4">
+            <h3 class="card-title"><i class="ph ph-archive" style="color:var(--primary);"></i> Histórico</h3>
+            <p class="page-sub" style="font-size:.9rem;margin-bottom:1.5rem;">Consulta el cierre mensual de todos tus periodos.</p>
+            <a href="{{ url_for('panel.historico') }}" class="btn-primary btn-ghost" style="width:100%;justify-content:center;"><i class="ph ph-calendar-check" style="color:var(--primary);"></i> Ver histórico mensual</a>
+        </div>
+    </div>
+</div>
+
+{# ============ MODAL: EDITAR RECURRENTE ============ #}
+<div class="modal-backdrop" id="modalRec" role="dialog" aria-modal="true" aria-labelledby="modalRecTitulo">
+    <form class="modal" method="POST" action="{{ url_for('ajustes.settings') }}">
+        <h3 id="modalRecTitulo"><i class="ph ph-pencil-simple" style="color:var(--primary);"></i> Editar recurrente</h3>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="accion" value="editar_recurrente">
+        <input type="hidden" name="recurrente_id" id="erId">
+        <div class="form-group"><label for="erTipo">Tipo</label>
+            <select id="erTipo" name="tipo" class="js-tipo-rec" data-destino="erCategoria"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
+        <div class="form-group"><label for="erConcepto">Concepto</label><input type="text" id="erConcepto" name="concepto" class="form-input" required maxlength="200"></div>
+        <div class="grid-2">
+            <div class="form-group"><label for="erImporte">Importe (€)</label><input type="number" step="0.01" min="0.01" id="erImporte" name="importe" class="form-input" required></div>
+            <div class="form-group"><label for="erDia">Día del mes</label><input type="number" min="1" max="31" id="erDia" name="dia_mes" class="form-input" required></div>
+        </div>
+        <div class="form-group"><label for="erCategoria">Categoría</label>
+            <select id="erCategoria" name="categoria">
+                <option value="">Automática</option>
+                <optgroup label="Gastos" data-tipo="gasto">{% for c in categorias_gasto %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>
+                <optgroup label="Ingresos" data-tipo="ingreso">{% for c in categorias_ingreso %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</optgroup>
+            </select></div>
+        <p class="kpi-hint">Los cambios se aplican desde el próximo registro; los ya hechos no se modifican.</p>
+        <div class="modal-actions">
+            <button type="button" class="btn-primary btn-sm btn-ghost" id="erCancelar">Cancelar</button>
+            <button type="submit" class="btn-primary btn-sm">Guardar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    /* ---------- Pestañas (la URL #recurrentes también las abre) ---------- */
+    function activarPestana(id) {
+        const pestana = document.querySelector('.settings-tab[data-tab="' + id + '"]');
+        const panel = document.getElementById('panel-' + id);
+        if (!pestana || !panel) return false;
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+        pestana.classList.add('active'); panel.classList.add('active');
+        try { localStorage.setItem('findash_active_tab', id); } catch (e) {}
+        if (typeof animateAllCards === 'function') animateAllCards();
+        return true;
+    }
+    document.querySelectorAll('.settings-tab').forEach(t => t.addEventListener('click', () => {
+        activarPestana(t.dataset.tab);
+        history.replaceState(null, '', '#' + t.dataset.tab);
+    }));
+    let inicial = (location.hash || '').replace('#', '');
+    if (!inicial) { try { inicial = localStorage.getItem('findash_active_tab') || ''; } catch (e) {} }
+    if (!activarPestana(inicial)) activarPestana('perfil');
+
+    /* ---------- Categorías según el tipo (gasto / ingreso) ---------- */
+    function filtrarCategorias(selectTipo) {
+        const destino = document.getElementById(selectTipo.dataset.destino);
+        if (!destino) return;
+        destino.querySelectorAll('optgroup').forEach(g => { const ok = g.dataset.tipo === selectTipo.value; g.hidden = !ok; g.disabled = !ok; });
+        const sel = destino.selectedOptions[0];
+        if (sel && sel.parentElement.tagName === 'OPTGROUP' && sel.parentElement.disabled) destino.value = '';
+    }
+    document.querySelectorAll('.js-tipo-rec').forEach(s => { s.addEventListener('change', () => filtrarCategorias(s)); filtrarCategorias(s); });
+
+    /* ---------- Modal de edición de recurrentes ---------- */
+    const modal = document.getElementById('modalRec');
+    document.querySelectorAll('.js-editar-rec').forEach(b => b.addEventListener('click', () => {
+        const d = b.dataset;
+        document.getElementById('erId').value = d.id;
+        document.getElementById('erTipo').value = d.tipo;
+        document.getElementById('erConcepto').value = d.concepto;
+        document.getElementById('erImporte').value = d.importe;
+        document.getElementById('erDia').value = d.dia;
+        const cat = document.getElementById('erCategoria');
+        filtrarCategorias(document.getElementById('erTipo'));
+        if (d.categoria && !Array.from(cat.options).some(o => o.value === d.categoria)) {
+            const o = document.createElement('option'); o.value = d.categoria; o.textContent = d.categoria; cat.appendChild(o);
+        }
+        cat.value = d.categoria;
+        modal.classList.add('open');
+        document.getElementById('erConcepto').focus();
+    }));
+    const cerrar = () => modal.classList.remove('open');
+    document.getElementById('erCancelar').addEventListener('click', cerrar);
+    modal.addEventListener('click', (e) => { if (e.target === modal) cerrar(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrar(); });
+})();
+</script>
+{% endblock %}

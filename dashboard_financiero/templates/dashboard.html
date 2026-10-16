@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% from "_macros.html" import selector_periodo %}
+
+{% block title %}Panel de Control - FinDash{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <h1 class="page-title">Hola, {{ nombre }}</h1>
+        <p class="page-sub">Aquí tienes la radiografía de tu salud financiera.</p>
+    </div>
+    {% if not es_nuevo_usuario %}{{ selector_periodo(periodo, rango, hoy) }}{% endif %}
+</header>
+
+{% if es_nuevo_usuario %}
+{# ===================== MODO DESPEGUE ===================== #}
+<section class="despegue">
+    <i class="ph-fill ph-rocket-launch" style="font-size:3rem;color:var(--primary);"></i>
+    <h2>Todo listo para despegar</h2>
+    <p>Aún no hay movimientos. Importa el extracto de tu banco (CSV, Excel, PDF o texto copiado) y FinDash
+       detectará fechas, importes y categorías por ti. También puedes empezar con datos de ejemplo.</p>
+    <div class="despegue-actions">
+        <a href="{{ url_for('movimientos.transactions') }}#importar" class="btn-primary"><i class="ph ph-upload-simple"></i> Importar extracto</a>
+        <a href="{{ url_for('movimientos.anadir') }}" class="btn-primary btn-ghost"><i class="ph ph-plus-circle"></i> Añadir un movimiento</a>
+        <form method="POST" action="{{ url_for('panel.cargar_demo') }}" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-primary btn-ghost"><i class="ph ph-magic-wand"></i> Ver con datos de ejemplo</button>
+        </form>
+    </div>
+</section>
+{% else %}
+
+{% if tiene_demo %}
+<div class="alert-banner info demo-banner">
+    <span><i class="ph-bold ph-magic-wand"></i> Estás viendo datos de ejemplo. Cuando quieras, bórralos y empieza con los tuyos.</span>
+    <form method="POST" action="{{ url_for('panel.borrar_demo') }}" style="margin:0;" onsubmit="return confirm('¿Borrar los datos de ejemplo? Tus propios movimientos no se tocarán.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-primary btn-xs btn-ghost">Borrar datos de ejemplo</button>
+    </form>
+</div>
+{% endif %}
+
+{% if mostrar_wrapped and wrapped %}
+{# ===================== WRAPPED MENSUAL ===================== #}
+<section class="wrapped-card" aria-label="Resumen de {{ wrapped.mes_nombre }}">
+    <form method="POST" action="{{ url_for('panel.cerrar_wrapped') }}" class="wrapped-close">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="mes" value="{{ wrapped.mes }}">
+        <button type="submit" title="Ocultar este resumen" aria-label="Ocultar resumen"><i class="ph ph-x"></i></button>
+    </form>
+    <h2><i class="ph-fill ph-confetti" style="color:var(--primary);"></i> Tu {{ wrapped.mes_nombre }} en cifras</h2>
+    <p class="page-sub">
+        {% if wrapped.ahorro > 0 %}Cerraste el mes ahorrando <strong class="money">{{ wrapped.ahorro | format_currency }}</strong>
+            ({{ wrapped.ratio_ahorro }}% de tus ingresos).
+        {% elif wrapped.ahorro < 0 %}El mes se cerró con un déficit de <strong class="money">{{ (-wrapped.ahorro) | format_currency }}</strong>.
+        {% else %}El mes se cerró en equilibrio.{% endif %}
+        {% if meta_activa and wrapped.ahorro > 0 and meta_activa.cantidad_objetivo > 0 %}
+            Eso equivale a un {{ (wrapped.ahorro / meta_activa.cantidad_objetivo * 100) | round(1) }}% de tu meta «{{ meta_activa.nombre }}».
+        {% endif %}
+    </p>
+    <div class="wrapped-grid">
+        <div class="wrapped-item"><small>Ingresos</small><strong class="text-success money">{{ wrapped.ingresos | format_currency }}</strong></div>
+        <div class="wrapped-item"><small>Gastos</small><strong class="text-danger money">{{ wrapped.gastos | format_currency }}</strong>
+            {% if wrapped.variacion_gastos is not none %}
+            <div class="kpi-hint">{{ '+' if wrapped.variacion_gastos > 0 else '' }}{{ wrapped.variacion_gastos }}% vs. el mes anterior</div>{% endif %}
+        </div>
+        <div class="wrapped-item"><small>Ahorro</small><strong class="money" style="color:var(--primary);">{{ wrapped.ahorro | format_currency }}</strong></div>
+        {% if wrapped.top_categorias %}
+        <div class="wrapped-item wrapped-item--wide"><small>Donde más gastaste</small>
+            {% for c in wrapped.top_categorias %}
+            <div class="wrapped-rank-row">
+                <span class="wrapped-rank-name" title="{{ c.categoria }}">{{ loop.index }}. {{ c.categoria }}</span><span class="money">{{ c.total | format_currency }}</span>
+            </div>
+            {% endfor %}
+        </div>{% endif %}
+        {% if wrapped.mayor_gasto %}
+        <div class="wrapped-item"><small>Tu mayor gasto</small><strong class="money">{{ wrapped.mayor_gasto.importe | format_currency }}</strong>
+            <div class="kpi-hint">{{ wrapped.mayor_gasto.concepto }} · {{ wrapped.mayor_gasto.fecha }}</div>
+        </div>{% endif %}
+    </div>
+</section>
+{% endif %}
+
+{% if alertas_presupuesto %}
+<div style="margin-bottom:1.5rem;">
+    {% for alerta in alertas_presupuesto %}
+    <div class="alert-banner {{ alerta.nivel }}">
+        <i class="ph-bold ph-warning-circle"></i>
+        <span>{{ alerta.texto }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-title">Patrimonio Neto</div>
+        <div class="kpi-value animate-number money" style="color:{{ 'var(--text-main)' if saldo >= 0 else 'var(--danger)' }};" data-final-text="{{ saldo | format_currency }}">{{ saldo | format_currency }}</div>
+        <div class="kpi-hint">Saldo acumulado de todo tu histórico</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Ingresos · {{ rango.etiqueta }}</div>
+        <div class="kpi-value animate-number money" style="color:var(--success);" data-final-text="{{ totales.ingresos | format_currency }}">{{ totales.ingresos | format_currency }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Gastos · {{ rango.etiqueta }}</div>
+        <div class="kpi-value animate-number money" style="color:var(--danger);" data-final-text="{{ totales.gastos | format_currency }}">{{ totales.gastos | format_currency }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Tasa de Ahorro</div>
+        <div class="kpi-value" style="color:var(--primary);">{{ '%.1f'|format(ratio_ahorro) | replace('.', ',') }}%</div>
+        <div class="kpi-hint money">{{ 'Ahorro' if totales.ahorro >= 0 else 'Déficit' }}: {{ totales.ahorro | format_currency }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Previsión fin de mes</div>
+        <div class="kpi-value money" style="color:{{ 'var(--info)' if proyeccion.saldo_proyectado >= 0 else 'var(--danger)' }};">{{ proyeccion.saldo_proyectado | format_currency }}</div>
+        <div class="kpi-hint">
+            {% if proyeccion.dias_restantes > 0 %}A ~<span class="money">{{ proyeccion.gasto_diario | format_currency }}</span>/día{% if proyeccion.fijos.gastos or proyeccion.fijos.ingresos %} + fijos pendientes{% endif %}
+            {% else %}El mes termina hoy{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="bento-grid" style="margin-top:0;">
+
+    <div class="bento-card span-8" style="min-height:380px;">
+        <h3 class="card-title"><i class="ph ph-chart-line" style="color:var(--primary);"></i> Evolución del saldo{% if chart_proyeccion %} y previsión{% endif %}</h3>
+        <div style="flex:1;position:relative;width:100%;min-height:290px;">
+            <canvas id="chartPatrimonio" role="img" aria-label="Evolución del saldo acumulado"></canvas>
+        </div>
+    </div>
+
+    <div class="bento-card span-4" style="justify-content:space-between;gap:1.5rem;">
+        <div>
+            <h3 class="card-title"><i class="ph ph-target" style="color:var(--success);"></i> {{ 'Metas' if metas|length > 1 else 'Meta activa' }}</h3>
+            {% if metas %}
+                {% for m in metas[:3] %}
+                <div style="margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.9rem;font-weight:700;">
+                        <span>{{ m.nombre }}</span>
+                        <span style="color:var(--text-secondary);" class="money">{{ saldo | format_currency if saldo > 0 else '0,00 €' }} / {{ m.cantidad_objetivo | format_currency }}</span>
+                    </div>
+                    <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ m.porcentaje }}%;"></div></div>
+                    <div class="kpi-hint" style="text-align:right;">
+                        {% if m.completada %}¡Meta conseguida! 🎉{% else %}{{ m.porcentaje | string | replace('.', ',') }}% · faltan <span class="money">{{ m.restante | format_currency }}</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% if ahorro_mes_pasado > 0 and meta_activa and meta_activa.restante > 0 %}
+                <p class="kpi-hint">Al ritmo del mes pasado (<span class="money">{{ ahorro_mes_pasado | format_currency }}</span>) llegarías a «{{ meta_activa.nombre }}» en ~{{ ((meta_activa.restante / ahorro_mes_pasado) | round(0, 'ceil')) | int }} mes(es).</p>
+                {% endif %}
+            {% else %}
+                <div class="empty-mini">
+                    <p>No tienes objetivos activos.</p>
+                    <a href="{{ url_for('ajustes.settings') }}#metas" class="btn-primary btn-xs">Configurar</a>
+                </div>
+            {% endif %}
+        </div>
+
+        <div style="padding-top:1.5rem;border-top:1px solid var(--border-color);">
+            <h3 class="card-title"><i class="ph ph-hourglass" style="color:var(--warning);"></i> Colchón financiero</h3>
+            {% if runway.meses is not none %}
+                <div style="display:flex;align-items:baseline;gap:.4rem;margin-top:.5rem;">
+                    <span style="font-size:2.2rem;font-weight:900;line-height:1;" class="{{ 'text-danger' if runway.meses < 1 else '' }}">{{ runway.meses | string | replace('.', ',') }}</span>
+                    <span style="font-size:.95rem;font-weight:700;color:var(--text-secondary);">meses de autonomía</span>
+                </div>
+                <p class="kpi-hint" style="line-height:1.4;">
+                    {% if runway.saldo > 0 %}Tu saldo acumulado (<span class="money">{{ runway.saldo | format_currency }}</span>) cubre
+                    tu gasto medio de <span class="money">{{ runway.media_gasto | format_currency }}</span>/mes ({{ runway.base }}).
+                    {% else %}Tu saldo acumulado no es positivo, así que ahora mismo no hay colchón.{% endif %}
+                </p>
+            {% else %}
+                <p class="kpi-hint" style="line-height:1.4;margin-top:.5rem;">Hace falta algo de histórico de gastos para estimar cuántos meses puedes cubrir con tu saldo.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bento-card span-8" style="padding:0;overflow:hidden;">
+        <div class="card-head">
+            <h3 class="card-title" style="margin:0;"><i class="ph ph-clock-counter-clockwise" style="color:var(--info);"></i> Últimas operaciones</h3>
+            <a href="{{ url_for('movimientos.transactions') }}" class="link-primary">Ver historial completo →</a>
+        </div>
+        {% if movimientos %}
+        <div class="tx-container">
+            <table class="table-premium table-premium--compact">
+                <thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right;">Importe</th></tr></thead>
+                <tbody>
+                {% for mov in movimientos %}
+                <tr>
+                    <td class="text-muted fecha-cell">{{ mov.fecha }}</td>
+                    <td class="concepto-cell" title="{{ mov.concepto }}">{{ mov.concepto }}</td>
+                    <td><span class="cat-badge">{{ mov.categoria }}</span></td>
+                    <td class="num money {{ 'text-success' if mov.tipo == 'ingreso' else '' }}">{{ '+' if mov.tipo == 'ingreso' else '-' }}{{ mov.importe | format_currency }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding:3rem 2rem;text-align:center;color:var(--text-muted);">
+            <i class="ph ph-receipt" style="font-size:2.5rem;opacity:.4;"></i>
+            <p style="font-weight:600;margin-top:.5rem;">No hay movimientos en este periodo.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="bento-card span-4">
+        <div class="card-head" style="padding:0 0 1rem;border:none;">
+            <h3 class="card-title" style="margin:0;"><i class="ph ph-arrows-clockwise" style="color:var(--primary);"></i> Fijos pendientes</h3>
+            <a href="{{ url_for('ajustes.settings') }}#recurrentes" class="link-primary">Gestionar</a>
+        </div>
+        {% if recurrentes_pendientes %}
+            {% for r in recurrentes_pendientes %}
+            <div class="fijo-row">
+                <div><strong>{{ r.concepto }}</strong><div class="kpi-hint">Día {{ r.dia_mes }} · {{ r.categoria }}</div></div>
+                <span class="num money {{ 'text-success' if r.tipo == 'ingreso' else '' }}">{{ '+' if r.tipo == 'ingreso' else '-' }}{{ r.importe | format_currency }}</span>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="kpi-hint" style="line-height:1.5;">No quedan cargos fijos por llegar este mes. Añade alquiler, suscripciones o nómina como recurrentes y FinDash los registrará solo.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .card-head { padding: 1.4rem 1.75rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+    .link-primary { color: var(--primary); font-size: .85rem; font-weight: 700; text-decoration: none; }
+    .fijo-row { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid var(--border-color); font-size: .9rem; }
+    .fijo-row:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+{% if not es_nuevo_usuario %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const real = {{ chart_saldo_tiempo | tojson }};
+    const prevision = {{ chart_proyeccion | tojson }};
+    const lienzo = document.getElementById('chartPatrimonio');
+    if (!lienzo || typeof Chart === 'undefined') return;
+
+    let etiquetas = prevision ? prevision.labels.slice() : real.labels.slice();
+    let datosReales = real.data.slice();
+    let datosPrevision = prevision ? prevision.data.slice() : null;
+    while (datosReales.length < etiquetas.length) datosReales.push(null);   // la previsión añade el último día del mes
+
+    if (etiquetas.length === 0) {                       // sin actividad: línea plana para conservar el diseño
+        etiquetas = ['Sin actividad']; datosReales = [0];
+    } else if (real.labels.length === 1) {              // un solo punto: anclarlo a cero
+        etiquetas.unshift('Inicio'); datosReales.unshift(0);
+        if (datosPrevision) datosPrevision.unshift(null);
+    }
+
+    const css = getComputedStyle(document.documentElement);
+    const primario = css.getPropertyValue('--primary').trim() || '#00E599';
+    const info = css.getPropertyValue('--info').trim() || '#3b82f6';
+    const borde = css.getPropertyValue('--border-color').trim();
+    const tenue = css.getPropertyValue('--text-muted').trim();
+    const reducido = movimientoReducido();
+
+    const conjuntos = [{
+        label: 'Saldo acumulado', data: datosReales, borderColor: primario, borderWidth: 3,
+        pointBackgroundColor: primario, pointHoverRadius: 7, pointRadius: etiquetas.length > 40 ? 0 : 3,
+        tension: 0.3, fill: false, spanGaps: false
+    }];
+    if (datosPrevision) {
+        conjuntos.push({
+            label: 'Previsión a fin de mes', data: datosPrevision, borderColor: info, borderWidth: 2,
+            borderDash: [6, 6], pointRadius: 4, pointBackgroundColor: info, tension: 0, fill: false, spanGaps: true
+        });
+    }
+    new Chart(lienzo, {
+        type: 'line',
+        data: { labels: etiquetas, datasets: conjuntos },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: reducido ? false : { duration: 1200, easing: 'easeOutQuart' },
+            plugins: {
+                legend: { display: !!datosPrevision, labels: { color: tenue, font: { weight: '700', size: 11 } } },
+                tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + Number(c.parsed.y).toLocaleString('es-ES', {minimumFractionDigits: 2}) + ' €' } }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: tenue, maxTicksLimit: 8, font: { weight: '600', size: 11 } } },
+                y: { grid: { color: borde }, ticks: { color: tenue, font: { weight: '600', size: 11 },
+                     callback: (v) => v.toLocaleString('es-ES') + ' €' } }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

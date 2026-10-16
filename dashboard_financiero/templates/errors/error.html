@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} - FinDash{% endblock %}
+{% block content %}
+<div style="min-height:70vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem;">
+    <div style="text-align:center;max-width:460px;">
+        <div style="font-size:4.5rem;font-weight:900;color:var(--primary);letter-spacing:-3px;line-height:1;">{{ codigo }}</div>
+        <h1 style="font-size:1.6rem;font-weight:800;margin:1rem 0 .5rem;">{{ titulo }}</h1>
+        <p style="color:var(--text-secondary);line-height:1.55;margin-bottom:1.75rem;">{{ mensaje }}</p>
+        <a href="{{ url_for('panel.dashboard') if session.get('usuario_id') else url_for('main.index') }}" class="btn-primary">
+            <i class="ph ph-house"></i> {{ 'Volver al panel' if session.get('usuario_id') else 'Ir al inicio' }}
+        </a>
+    </div>
+</div>
+{% endblock %}

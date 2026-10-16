@@ -1,0 +1,26 @@
+{# Selector de periodo compartido por Panel y Analytics (mes / 90 días / año / personalizado). #}
+{% macro selector_periodo(periodo, rango, hoy) %}
+<div class="period-wrap">
+    <div class="period-selector" role="group" aria-label="Periodo">
+        <a href="?periodo=mes" class="period-btn {% if periodo == 'mes' %}active{% endif %}">Mes</a>
+        <a href="?periodo=trimestre" class="period-btn {% if periodo == 'trimestre' %}active{% endif %}">90 Días</a>
+        <a href="?periodo=anio" class="period-btn {% if periodo == 'anio' %}active{% endif %}">Año</a>
+        <button type="button" class="period-btn {% if periodo == 'custom' %}active{% endif %}" id="btnRangoCustom"
+                aria-expanded="{{ 'true' if periodo == 'custom' else 'false' }}" aria-controls="formRango">Personalizado</button>
+    </div>
+    <form method="GET" class="range-form {% if periodo == 'custom' %}open{% endif %}" id="formRango">
+        <input type="hidden" name="periodo" value="custom">
+        <input type="date" name="desde" class="form-input" value="{{ rango.desde }}" max="{{ hoy }}" required aria-label="Desde">
+        <span style="color:var(--text-muted);">→</span>
+        <input type="date" name="hasta" class="form-input" value="{{ rango.hasta }}" max="{{ hoy }}" required aria-label="Hasta">
+        <button type="submit" class="btn-primary btn-xs">Aplicar</button>
+    </form>
+</div>
+<script>
+    document.getElementById('btnRangoCustom').addEventListener('click', function () {
+        var f = document.getElementById('formRango');
+        var abierto = f.classList.toggle('open');
+        this.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+    });
+</script>
+{% endmacro %}

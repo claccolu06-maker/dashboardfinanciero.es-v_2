@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+{# El tema se resuelve ANTES de pintar (script del <head>) para que no haya parpadeo.
+   Con sesión iniciada manda la preferencia guardada en la base de datos. #}
+<html lang="es" data-theme="{{ 'light' if tema_servidor == 'light' else 'dark' }}" data-theme-pref="{{ tema_servidor }}"
+      {% if animaciones %}data-reduce-motion="1"{% endif %} {% if privacidad %}data-privacy="1"{% endif %}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="color-scheme" content="dark light">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}FinDash{% endblock %}</title>
+
+    <script>
+    (function () {
+        var raiz = document.documentElement;
+        var sesion = {{ 'true' if session.get('usuario_id') else 'false' }};
+        var pref = raiz.getAttribute('data-theme-pref') || 'dark';
+        try {
+            if (sesion) { localStorage.setItem('findash_theme', pref); }
+            else { pref = localStorage.getItem('findash_theme') || 'dark'; }
+        } catch (e) {}
+        if (pref !== 'light' && pref !== 'dark' && pref !== 'system') { pref = 'dark'; }
+        var efectivo = pref === 'system'
+            ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : pref;
+        raiz.setAttribute('data-theme', efectivo);
+        raiz.setAttribute('data-theme-pref', pref);
+        raiz.style.colorScheme = efectivo;
+    })();
+    </script>
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FinDash">
+    <meta name="theme-color" content="#0a0a0b">
+    <meta name="description" content="FinDash - Controla tus ingresos, gastos y ahorro desde un único panel claro y rápido.">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3">
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body id="layoutWrapper" class="{% if session.get('usuario_id') %}app-layout{% else %}auth-layout{% endif %}">
+
+    <div id="toast-container" role="status" aria-live="polite">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="toast {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+    </div>
+
+    {% if session.get('usuario_id') %}
+    {% set ep = request.endpoint or '' %}
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <i class="ph-fill ph-wallet"></i>
+            <span class="brand-text">FinDash</span>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Navegación principal">
+            <a href="{{ url_for('panel.dashboard') }}" class="nav-item {% if ep == 'panel.dashboard' %}active{% endif %}">
+                <i class="ph ph-squares-four nav-icon"></i>
+                <span class="nav-text">Panel Principal</span>
+            </a>
+            <a href="{{ url_for('panel.analytics') }}" class="nav-item {% if ep == 'panel.analytics' %}active{% endif %}">
+                <i class="ph ph-chart-line-up nav-icon"></i>
+                <span class="nav-text">Analytics</span>
+            </a>
+            <a href="{{ url_for('movimientos.anadir') }}" class="nav-item {% if ep == 'movimientos.anadir' %}active{% endif %}">
+                <i class="ph ph-plus-circle nav-icon"></i>
+                <span class="nav-text">Nuevo Registro</span>
+            </a>
+            <a href="{{ url_for('movimientos.transactions') }}" class="nav-item {% if ep == 'movimientos.transactions' %}active{% endif %}">
+                <i class="ph ph-list-dashes nav-icon"></i>
+                <span class="nav-text">Historial e Importar</span>
+            </a>
+            <a href="{{ url_for('panel.historico') }}" class="nav-item {% if ep == 'panel.historico' %}active{% endif %}">
+                <i class="ph ph-archive nav-icon"></i>
+                <span class="nav-text">Histórico</span>
+            </a>
+            <a href="{{ url_for('ajustes.settings') }}" class="nav-item {% if ep == 'ajustes.settings' %}active{% endif %}">
+                <i class="ph ph-sliders-horizontal nav-icon"></i>
+                <span class="nav-text">Configuración</span>
+            </a>
+        </nav>
+
+        <button type="button" class="collapse-trigger" id="sidebarCollapseBtn" title="Contraer menú" aria-label="Contraer menú">
+            <i class="ph ph-caret-left" id="collapseIcon"></i>
+        </button>
+
+        <div class="user-card">
+            <div class="user-avatar">{{ (session.get('nombre') or 'U')[:1]|upper }}</div>
+            <div class="user-meta">
+                <div class="user-name">{{ session.get('nombre') or 'Usuario' }}</div>
+                <div class="user-sub">Mi cuenta</div>
+            </div>
+            <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" title="Cerrar sesión" aria-label="Cerrar sesión" class="logout-btn">
+                    <i class="ph ph-sign-out"></i>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <nav class="mobile-bottom-nav" aria-label="Navegación móvil">
+        <a href="{{ url_for('panel.dashboard') }}" class="{% if ep == 'panel.dashboard' %}active{% endif %}">
+            <i class="ph ph-squares-four"></i>
+            <span>Panel</span>
+        </a>
+        <a href="{{ url_for('movimientos.transactions') }}" class="{% if ep == 'movimientos.transactions' %}active{% endif %}">
+            <i class="ph ph-receipt"></i>
+            <span>Historial</span>
+        </a>
+        <a href="{{ url_for('movimientos.anadir') }}" class="{% if ep == 'movimientos.anadir' %}active{% endif %}" aria-label="Nuevo registro">
+            <i class="ph-fill ph-plus-circle mobile-add"></i>
+        </a>
+        <a href="{{ url_for('panel.analytics') }}" class="{% if ep == 'panel.analytics' %}active{% endif %}">
+            <i class="ph ph-chart-line-up"></i>
+            <span>Analytics</span>
+        </a>
+        <a href="{{ url_for('ajustes.settings') }}" class="{% if ep == 'ajustes.settings' %}active{% endif %}">
+            <i class="ph ph-gear"></i>
+            <span>Ajustes</span>
+        </a>
+    </nav>
+
+    {% endif %}
+
+    <main class="{% if session.get('usuario_id') %}main-content{% else %}auth-content-wrapper{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').catch(function (err) {
+                    console.warn('PWA:', err);
+                });
+            });
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+
+</body>
+</html>
